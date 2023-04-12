@@ -189,8 +189,8 @@ def main():
     # initialize variables
     position_size = 100
     entry_price = 1.2000
-    stop_loss = 0.0050
-    take_profit = 0.0100
+    stop_loss = 0.0025
+    take_profit = 0.005
     open_positions = []
     is_reversal_key_point = False
     
