@@ -31,7 +31,7 @@ TRADE_SIZE = get_account_balance()  # Entire USDT futures balance
 TRADE_TYPE = "MARKET"
 TRADE_LVRG = 20
 STOP_LOSS_THRESHOLD = 0.025  # 2.5% stop loss threshold
-TAKE_PROFIT_THRESHOLD = 0.05 # 5% take profit threshold
+TAKE_PROFIT_THRESHOLD = 0.05 # 5% stop loss threshold
 SINEWAVE_PERIOD = 12  # 12 periods for sinewave
 ENTRY_MOMENTUM_THRESHOLD = 3  # 3 consecutive candles above or below sinewave
 REVERSAL_KEY_POINT = 6  # 6 periods after entry momentum for reversal key point
@@ -233,9 +233,9 @@ def main(trade_type):
     # Determine the initial trade signal
     sinewave = get_sinewave(TRADE_SYMBOL, interval, SINEWAVE_PERIOD)
     momentum = 0
-    if sinewave > 0:
+    if sinewave < 0:
         momentum = 1
-    elif sinewave < 0:
+    elif sinewave > 0:
         momentum = -1
 
     closed_positions = []
