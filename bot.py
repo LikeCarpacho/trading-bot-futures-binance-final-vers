@@ -37,7 +37,6 @@ ENTRY_MOMENTUM_THRESHOLD = 3  # 3 consecutive candles above or below sinewave
 REVERSAL_KEY_POINT = 6  # 6 periods after entry momentum for reversal key point
 
 # Variables
-#client = None
 closed_positions = []
 
 def get_talib_poly_channel(data, degree):
@@ -115,8 +114,8 @@ def long_condition(candles, stop_loss, take_profit):
     sw_diff = np.diff(sw)
     max_sw = np.max(sw)
     min_sw = np.min(sw)
-    entry_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Entry point is 3/4 of the way up the sine wave
-    exit_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Exit point is 3/4 of the way down the sine wave
+    exit_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Exit point is 3/4 of the way up the sine wave
+    entry_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Entry point is 3/4 of the way down the sine wave
     stop_loss_price = candles['1m'][-1]['close'] * (1 - stop_loss)
     take_profit_price = candles['1m'][-1]['close'] * (1 + take_profit)
     
@@ -130,8 +129,8 @@ def long_condition(candles, stop_loss, take_profit):
     print("Take profit percentage:", take_profit)
     print("Stop loss price:", stop_loss_price)
     print("Take profit price:", take_profit_price)
-    
-    if (sw[-1] > entry_point) and (sw_diff[-1] > sw_diff[-2]):
+
+    if (sw[-1] < entry_point) and (sw_diff[-1] < sw_diff[-2]):
         print("Long position condition met")
         return True, stop_loss_price, take_profit_price
     else:
@@ -149,8 +148,8 @@ def short_condition(candles, stop_loss, take_profit):
     sw_diff = np.diff(sw)
     max_sw = np.max(sw)
     min_sw = np.min(sw)
-    entry_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Entry point is 3/4 of the way down the sine wave
-    exit_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Exit point is 3/4 of the way up the sine wave
+    entry_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Entry point is 3/4 of the way up the sine wave
+    exit_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Exit point is 3/4 of the way down the sine wave
     stop_loss_price = candles['1m'][-1]['close'] * (1 + stop_loss)
     take_profit_price = candles['1m'][-1]['close'] * (1 - take_profit)
     print("Sine wave values:", sw)
@@ -164,7 +163,8 @@ def short_condition(candles, stop_loss, take_profit):
     print("Current candle close price:", candles['1m'][-1]['close'])
     print("Stop loss price:", stop_loss_price)
     print("Take profit price:", take_profit_price)
-    if (sw[-1] < entry_point) and (sw_diff[-1] < sw_diff[-2]):
+
+    if (sw[-1] > entry_point) and (sw_diff[-1] > sw_diff[-2]):
         print("Short condition met!")
         return True, stop_loss_price, take_profit_price
     else:
@@ -209,156 +209,10 @@ def get_sinewave(ticker, interval, period):
 
     return sinewave
 
-
-def main(trade_type):
-    """Main function for trading"""
-    global closed_positions
-
-    # Connect to Binance API
-    print("Connecting to Binance API...")
-    client = Client(api_key, api_secret)
-
-    # Determine the interval for historical klines
-    if trade_type == 'long':
-        interval = Client.KLINE_INTERVAL_5MINUTE
-    else:
-        interval = Client.KLINE_INTERVAL_15MINUTE
-
-    # Determine the trading direction
-    if trade_type == 'long':
-        side = Client.SIDE_BUY
-    else:
-        side = Client.SIDE_SELL
-
-    # Determine the initial trade signal
-    sinewave = get_sinewave(TRADE_SYMBOL, interval, SINEWAVE_PERIOD)
-    momentum = 0
-    if sinewave < 0:
-        momentum = 1
-    elif sinewave > 0:
-        momentum = -1
-
-    closed_positions = []
-
-    # Enter the trading loop
-    while True:
-        # Check if we should enter a new trade
-        sinewave = get_sinewave(TRADE_SYMBOL, interval, SINEWAVE_PERIOD)
-        if momentum == 0 and sinewave > 0:
-            momentum = 1
-            entry_momentum_counter = 0
-            entry_price = float(client.futures_symbol_ticker(symbol=TRADE_SYMBOL)['price'])
-            log_trade_details(trade_type, entry_price, entry_price * (1 - STOP_LOSS_THRESHOLD), entry_price * (1 + TAKE_PROFIT_THRESHOLD), 1)
-            order = client.futures_create_order(
-                symbol=TRADE_SYMBOL,
-                side=side,
-                type=Client.ORDER_TYPE_MARKET,
-                quantity=1
-            )
-            print(f"{trade_type.upper()} TRADE ENTERED - Market order placed")
-            print(f"Order ID: {order['orderId']}")
-            print(f"Price: {order['price']}")
-            print(f"Quantity: {order['origQty']}")
-            print("Waiting for take profit or stop loss...")
-
-        # Check for open positions and close any that have met their stop loss or take profit conditions
-        open_positions = client.futures_position_information(symbol=TRADE_SYMBOL)
-        for position in open_positions:
-            if position['positionAmt'] != '0' and position['symbol'] == TRADE_SYMBOL:
-                if position['side'] == side:
-                    if float(position['unRealizedProfit']) > take_profit:
-                        print(f"{trade_type.upper()} TRADE - TAKE PROFIT HIT - Closing position...")
-                        order = client.futures_create_order(
-                            symbol=TRADE_SYMBOL,
-                            side=Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY,
-                            type=Client.ORDER_TYPE_MARKET,
-                            quantity=abs(float(position['positionAmt']))
-                        )
-                        print(f"Order ID: {order['orderId']}")
-                        print(f"Price: {order['price']}")
-                        print(f"Quantity: {order['origQty']}")
-                        closed_positions.append(position['positionSide'])
-                    elif float(position['unRealizedProfit']) < -stop_loss:
-                        print(f"{trade_type.upper()} TRADE - STOP LOSS HIT - Closing position...")
-                        order = client.futures_create_order(
-                            symbol=TRADE_SYMBOL,
-                            side=Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY,
-                            type=Client.ORDER_TYPE_MARKET,
-                            quantity=abs(float(position['positionAmt']))
-                        )
-                        print(f"Order ID: {order['orderId']}")
-                        print(f"Price: {order['price']}")
-                        print(f"Quantity: {order['origQty']}")
-                        closed_positions.append(position['positionSide'])
-
-        # Check if any positions have been closed during this iteration
-        if len(closed_positions) > 0:
-            print("Positions closed this iteration. Waiting before continuing...")
-            time.sleep(5)
-            closed_positions = []
-
-        # Check for reversal key point of entry momentum
-        if entry_momentum_counter < ENTRY_MOMENTUM_PERIOD:
-            entry_momentum_counter += 1
-        elif momentum == 1 and sinewave < 0:
-            print(f"{trade_type.upper()} TRADE - REVERSAL KEY POINT OF ENTRY MOMENTUM - Closing position...")
-            for position in open_positions:
-                if position['positionAmt'] != '0' and position['positionSide'] == side and position['symbol'] == TRADE_SYMBOL:
-                    order = client.futures_create_order(
-                        symbol=TRADE_SYMBOL,
-                        side=Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY,
-                        type=Client.ORDER_TYPE_MARKET,
-                        quantity=abs(float(position['positionAmt'])),
-                        reduceOnly=True
-                    )
-                    closed_positions.append(position['orderId'])
-
-        # Wait a short period of time before checking for new trades
-        if len(closed_positions) > 0:
-            print("Waiting before checking for new trades...")
-            time.sleep(TRADE_WAIT_TIME)
-
-        # Check if we should enter a new trade
-        sinewave = get_sinewave(TRADE_SYMBOL, interval, SINEWAVE_PERIOD)
-        if momentum == 0 and sinewave > 0:
-            momentum = 1
-            entry_momentum_counter = 0
-            entry_price = float(client.futures_symbol_ticker(symbol=TRADE_SYMBOL)['price'])
-            log_trade_details(trade_type, entry_price, entry_price * (1 - STOP_LOSS_THRESHOLD), entry_price * (1 + TAKE_PROFIT_THRESHOLD), 1)
-            order = client.futures_create_order(
-                symbol=TRADE_SYMBOL,
-                side=side,
-                type=Client.ORDER_TYPE_MARKET,
-                quantity=1
-            )
-            print(f"{trade_type.upper()} TRADE ENTERED - Market order placed")
-            print(f"Order ID: {order['orderId']}")
-            print(f"Price: {order['price']}")
-            print(f"Quantity: {order['origQty']}")
-
-        # Check for reversal key point of entry momentum
-        elif entry_momentum_counter < ENTRY_MOMENTUM_PERIOD:
-            entry_momentum_counter += 1
-
-        elif momentum == 1 and sinewave < 0:
-            print(f"{trade_type.upper()} TRADE - REVERSAL KEY POINT OF ENTRY MOMENTUM - Closing position...")
-            for position in open_positions:
-                if position['positionAmt'] != '0' and position['positionSide'] == side and position['symbol'] == TRADE_SYMBOL:
-                    order = client.futures_create_order(
-                        symbol=TRADE_SYMBOL,
-                        side=Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY,
-                        type=Client.ORDER_TYPE_MARKET,
-                        quantity=abs(float(position['positionAmt'])),
-                        reduceOnly=True
-                    )
-                    closed_positions.append(position['orderId'])
-                
-        # Update the list of open positions
-        open_positions = client.futures_position_information(symbol=TRADE_SYMBOL)
-
-        # Wait before checking for new trades
-        time.sleep(TRADE_WAIT_TIME)
-
+def main():
+    open_positions = client.futures_position_information()
+    side = get_trade_side()
+    
     # Check for stop loss or take profit
     else:
         closed_positions = []
@@ -367,34 +221,40 @@ def main(trade_type):
                 current_price = float(client.futures_symbol_ticker(symbol=TRADE_SYMBOL)['price'])
                 stop_loss_price = float(position['entryPrice']) * (1 - STOP_LOSS_THRESHOLD)
                 take_profit_price = float(position['entryPrice']) * (1 + TAKE_PROFIT_THRESHOLD)
-                if current_price <= stop_loss_price or current_price >= take_profit_price:
-                    if current_price <= stop_loss_price:
-                        print(f"{trade_type.upper()} TRADE - STOP LOSS HIT - Closing position...")
-                    else:
-                        print(f"{trade_type.upper()} TRADE - TAKE PROFIT HIT - Closing position...")
-                        order = client.futures_create_order(
-                            symbol=TRADE_SYMBOL,
-                            side=Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY,
-                            type=Client.ORDER_TYPE_MARKET,
-                            quantity=abs(float(position['positionAmt'])),
-                            reduceOnly=True
-                        )
-                        closed_positions.append(position['orderId'])
+                if current_price <= stop_loss_price:
+                    print(f"{trade_type.upper()} TRADE - STOP LOSS HIT - Closing position...")
+                    order = client.futures_create_order(
+                        symbol=TRADE_SYMBOL,
+                        side=Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY,
+                        type=Client.ORDER_TYPE_MARKET,
+                        quantity=abs(float(position['positionAmt'])),
+                        reduceOnly=True
+                    )
+                    closed_positions.append(position['orderId'])
+                elif current_price >= take_profit_price:
+                    print(f"{trade_type.upper()} TRADE - TAKE PROFIT HIT - Closing position...")
+                    order = client.futures_create_order(
+                        symbol=TRADE_SYMBOL,
+                        side=Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY,
+                        type=Client.ORDER_TYPE_MARKET,
+                        quantity=abs(float(position['positionAmt'])),
+                        reduceOnly=True
+                    )
+                    closed_positions.append(position['orderId'])
 
-            # Update the list of open positions
-            open_positions = client.futures_position_information(symbol=TRADE_SYMBOL)
+        # Close all positions in case of reversal of sine
+        if reversal_of_sine():
+            print(f"REVERSAL OF SINE - CLOSING ALL POSITIONS...")
+            for position in open_positions:
+                if position['positionAmt'] != '0' and position['symbol'] == TRADE_SYMBOL:
+                    order = client.futures_create_order(
+                        symbol=TRADE_SYMBOL,
+                        side=Client.SIDE_SELL if position['positionSide'] == Client.SIDE_BUY else Client.SIDE_BUY,
+                        type=Client.ORDER_TYPE_MARKET,
+                        quantity=abs(float(position['positionAmt'])),
+                        reduceOnly=True
+                    )
+                    closed_positions.append(position['orderId'])
 
-            # Check if all positions have been closed
-            if len(closed_positions) == len(open_positions):
-                # Change the side of the trade
-                side = Client.SIDE_SELL if side == Client.SIDE_BUY else Client.SIDE_BUY
-                trade_type = 'short' if side == Client.SIDE_SELL else 'long'
-                print(f"ALL {trade_type.upper()} TRADES CLOSED - CHANGING SIDE TO {trade_type.upper()}...")
-                # Enter a new position
-                momentum = 0
-                entry_momentum_counter = 0
-                time.sleep(TRADE_WAIT_TIME)
-                continue
-
-        # Wait before checking for new trades
-        time.sleep(TRADE_WAIT_TIME)
+        if closed_positions:
+            update_trade_log(closed_positions)
