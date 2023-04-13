@@ -137,7 +137,7 @@ def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
             momentum_counter -= 1
         elif diff[i] > 0 and diff[i+1] < 0:
             momentum_counter += 1
-    if all(price < lower for lower, price in zip(get_all_lows(candles), close_prices)) and momentum_counter == ENTRY_MOMENTUM_THRESHOLD:
+    if all(price < lower for lower, price in zip(get_all_lows(candles), close_prices)) and momentum_counter == -ENTRY_MOMENTUM_THRESHOLD:
         return True
     return False
 
@@ -152,7 +152,7 @@ def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
             momentum_counter -= 1
         elif diff[i] < 0 and diff[i+1] > 0:
             momentum_counter += 1
-    if all(price > upper for upper, price in zip(get_all_highs(candles), close_prices)) and momentum_counter == -ENTRY_MOMENTUM_THRESHOLD:
+    if all(price > upper for upper, price in zip(get_all_highs(candles), close_prices)) and momentum_counter == ENTRY_MOMENTUM_THRESHOLD:
         return True
     return False
 
@@ -192,6 +192,10 @@ def get_sinewave(ticker, interval, period):
     sinewave = ema1 - ema2
 
     return sinewave
+
+def get_market_price():
+    ticker = client.get_ticker(symbol=TRADE_SYMBOL)
+    return float(ticker['lastPrice'])
 
 def main():
     # initialize variables
