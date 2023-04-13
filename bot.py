@@ -80,9 +80,9 @@ print()
 candles = {}
 for interval in timeframes:
     tf_candles = client.futures_klines(symbol=TRADE_SYMBOL, interval=interval.lower(), startTime=start_time * 1000, endTime=end_time * 1000)
-    candles[interval] = []
+    candles[interval.lower()] = []
     for candle in tf_candles:
-        candles[interval].append({
+        candles[interval.lower()].append({
             'open': float(candle[1]),
             'high': float(candle[2]),
             'low': float(candle[3]),
