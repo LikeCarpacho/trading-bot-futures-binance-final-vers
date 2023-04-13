@@ -43,12 +43,17 @@ def get_talib_poly_channel(data, degree):
     """
     Returns polynomial regression channel using data and degree
     """
-    # Get polynomial regression values
-    pr, _, _ = talib.LINEARREG(data, timeperiod=degree)
-    # Calculate upper and lower channel lines
-    upper_channel = pr + np.std(data) * 2
-    lower_channel = pr - np.std(data) * 2
+    # Talib.LINEARREG outputs an array with `degree-1` NaN values at the beginning
+    # We need to remove these NaNs before continuing
+    pr = talib.LINEARREG(data, timeperiod=degree)
+    pr = pr[~np.isnan(pr)]
+    
+    # We need to calculate the standard deviation using the same number of values
+    # as the polynomial regression line, so we use `len(pr)` instead of `len(data)`
+    upper_channel = pr + np.std(data[-len(pr):]) * 2
+    lower_channel = pr - np.std(data[-len(pr):]) * 2
     return upper_channel, lower_channel
+
 
 # Define timeframes
 timeframes = ['8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
@@ -81,16 +86,19 @@ def get_mtf_signal(candles, timeframes):
     neutral_tf = None
     neutral_tf_typo = None
     for tf in timeframes:
-        slope, poly, lower_band, upper_band = get_talib_poly_channel(np.array(candles[tf]['close']), 3)
+        tf_data = np.array(candles[tf]['close'])
+        if len(tf_data) < 3:  # We need at least 3 values to calculate a linear regression line
+            continue
+        slope, poly, lower_band, upper_band = get_talib_poly_channel(tf_data, 3)
         channel_width = upper_band - lower_band
         signal = None
-        if candles[tf]['close'][-1] > upper_band[-1]:
+        if tf_data[-1] > upper_band[-1]:
             signal = 1
-        elif candles[tf]['close'][-1] < lower_band[-1]:
+        elif tf_data[-1] < lower_band[-1]:
             signal = -1
-        elif candles[tf]['close'][-1] < (upper_band[-1] + lower_band[-1]) / 2:
+        elif tf_data[-1] < (upper_band[-1] + lower_band[-1]) / 2:
             signal = -1
-        elif candles[tf]['close'][-1] > (upper_band[-1] + lower_band[-1]) / 2:
+        elif tf_data[-1] > (upper_band[-1] + lower_band[-1]) / 2:
             signal = 1
         mtf_signal[tf] = signal
         if neutral_tf is None and channel_width > 0:
@@ -115,20 +123,11 @@ def long_condition(candles, stop_loss, take_profit):
     sw_diff = np.diff(sw)
     max_sw = np.max(sw)
     min_sw = np.min(sw)
-    exit_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Exit point is 3/4 of the way up the sine wave
-    entry_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Entry point is 3/4 of the way down the sine wave
-    stop_loss_price = candles['1m'][-1]['close'] * (1 - stop_loss)
-    take_profit_price = candles['1m'][-1]['close'] * (1 + take_profit)
-    entry_momentum_count = 0
-    for i in range(1, len(sw)):
-        if sw_diff[i - 1] > 0 and sw_diff[i] < 0 and sw[i] < entry_point:
-            entry_momentum_count += 1
-        elif sw_diff[i - 1] < 0 and sw_diff[i] > 0 and sw[i] > entry_point:
-            entry_momentum_count -= 1
-        if entry_momentum_count == ENTRY_MOMENTUM_THRESHOLD:
-            return True, stop_loss_price, take_profit_price
-    return False, 0, 0
-
+    if sw[-1] > max_sw and sw_diff[-1] > ENTRY_MOMENTUM_THRESHOLD:
+        return True
+    elif sw[-1] < min_sw and sw_diff[-1] < -ENTRY_MOMENTUM_THRESHOLD:
+        return False
+    return False
 
 def short_condition(candles, stop_loss, take_profit):
     """
@@ -141,16 +140,11 @@ def short_condition(candles, stop_loss, take_profit):
     sw_diff = np.diff(sw)
     max_sw = np.max(sw)
     min_sw = np.min(sw)
-    exit_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Exit point is 3/4 of the way down the sine wave
-    entry_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Entry point is 3/4 of the way up the sine wave
-    stop_loss_price = candles['1m'][-1]['close'] * (1 + stop_loss)  # calculate stop loss price
-    take_profit_price = candles['1m'][-1]['close'] * (1 - take_profit)  # calculate take profit price
-    if sw[-2] > entry_point and sw[-1] < entry_point and sw[-1] < sw[-2] and sw[-1] < sw_diff[-1] and sw_diff[-1] < 0 and sw_diff[-2] < 0:
-        print("Short condition met.")
-        return True, stop_loss_price, take_profit_price
-    else:
-        print("Short condition not met.")
-        return False, 0, 0
+    if sw[-1] < min_sw and sw_diff[-1] < -ENTRY_MOMENTUM_THRESHOLD:
+        return True
+    elif sw[-1] > max_sw and sw_diff[-1] > ENTRY_MOMENTUM_THRESHOLD:
+        return False
+    return False
 
 def cancel_all_positions(symbol):
     """
