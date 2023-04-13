@@ -98,13 +98,12 @@ for interval in timeframes:
             'taker_buy_quote_asset_volume': candle[10]
         })
 
-        #Print candles for all timeframes
-        for interval in candles:
-            print(f"{interval} candles:")
-            for candle in candles[interval]:
-                print(candle)
-                print("--------")
-
+# Print candles for all timeframes
+for interval in candles:
+    print(f"{interval} candles:")
+    for candle in candles[interval]:
+        print(candle)
+        print("--------")
 
 def get_mtf_signal(candles, timeframes):
     """
@@ -241,6 +240,9 @@ def get_market_price():
     ticker = client.get_ticker(symbol=TRADE_SYMBOL)
     return float(ticker['lastPrice'])
 
+print("init main() function...")
+print()
+
 def main():
     # initialize variables
     position_size = 100
@@ -257,10 +259,14 @@ def main():
 
     # Calculate sinewave momentum
     for tf in timeframes:
-        current_price = candles[timeframes.index(tf)][-1]['close']
-        sinewave = talib.SINWAVE(candles[tf]['high'], candles[tf]['low'], SINEWAVE_PERIOD)
-        momentum = calculate_sine_momentum(candles[tf], tf, current_price, sinewave)
-        print(f"Sinewave momentum for {tf} timeframe: {momentum}")
+        if candles[tf]:
+            current_price = candles[timeframes.index(tf)][-1]['close']
+            sinewave = talib.SINWAVE(candles[tf]['high'], candles[tf]['low'], SINEWAVE_PERIOD)
+            momentum = calculate_sine_momentum(candles[tf], tf, current_price, sinewave)
+            print(f"Sinewave momentum for {tf} timeframe: {momentum}")
+        else:
+            print(f"No candles available for {tf} timeframe")
+
     
     while True:
         # get current market price
