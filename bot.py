@@ -117,14 +117,18 @@ def long_condition(candles, stop_loss, take_profit):
     min_sw = np.min(sw)
     exit_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Exit point is 3/4 of the way up the sine wave
     entry_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Entry point is 3/4 of the way down the sine wave
-    stop_loss_price = candles['1m'][-1]['close'] * (1 - stop_loss)  # calculate stop loss price
-    take_profit_price = candles['1m'][-1]['close'] * (1 + take_profit)  # calculate take profit price
-    if sw[-2] < entry_point and sw[-1] > entry_point and sw[-1] > sw[-2] and sw[-1] > sw_diff[-1] and sw_diff[-1] > 0 and sw_diff[-2] > 0:
-        print("Long condition met.")
-        return True, stop_loss_price, take_profit_price
-    else:
-        print("Long condition not met.")
-        return False, 0, 0
+    stop_loss_price = candles['1m'][-1]['close'] * (1 - stop_loss)
+    take_profit_price = candles['1m'][-1]['close'] * (1 + take_profit)
+    entry_momentum_count = 0
+    for i in range(1, len(sw)):
+        if sw_diff[i - 1] > 0 and sw_diff[i] < 0 and sw[i] < entry_point:
+            entry_momentum_count += 1
+        elif sw_diff[i - 1] < 0 and sw_diff[i] > 0 and sw[i] > entry_point:
+            entry_momentum_count -= 1
+        if entry_momentum_count == ENTRY_MOMENTUM_THRESHOLD:
+            return True, stop_loss_price, take_profit_price
+    return False, 0, 0
+
 
 def short_condition(candles, stop_loss, take_profit):
     """
