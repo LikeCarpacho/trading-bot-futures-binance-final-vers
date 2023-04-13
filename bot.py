@@ -67,7 +67,7 @@ def load_data(symbol, interval, start_time, end_time):
     return response_json
 
 # Define timeframes
-timeframes = ['8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
+timeframes = ['1d', '8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
 
 # Define start and end time for historical data
 start_time = int(time.time()) - (86400 * 30)  # 30 days ago
@@ -238,7 +238,7 @@ def main():
 
     # Calculate sinewave momentum
     for tf in timeframes:
-        current_price = candles[tf][-1]['close']
+        current_price = candles[timeframes.index(tf)][-1]['close']
         sinewave = talib.SINWAVE(candles[tf]['high'], candles[tf]['low'], SINEWAVE_PERIOD)
         momentum = calculate_sine_momentum(candles[tf], tf, current_price, sinewave)
         print(f"Sinewave momentum for {tf} timeframe: {momentum}")
