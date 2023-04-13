@@ -252,6 +252,7 @@ def main():
     take_profit = 0.0100
     open_positions = []
     is_reversal_key_point = False
+    timeframes = ['1d', '12h', '8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
 
     # Load data
     candles = {}
@@ -260,13 +261,14 @@ def main():
 
     # Calculate sinewave momentum
     for tf in timeframes:
-        if candles[tf]:
-            current_price = candles[timeframes.index(tf)][-1]['close']
+        if len(candles[tf]) > 0:
+            current_price = candles[tf][-1]['close']
             sinewave = talib.SINWAVE(candles[tf]['high'], candles[tf]['low'], SINEWAVE_PERIOD)
             momentum = calculate_sine_momentum(candles[tf], tf, current_price, sinewave)
             print(f"Sinewave momentum for {tf} timeframe: {momentum}")
         else:
-            print(f"No candles available for {tf} timeframe")
+            print(f"No data found for {tf} timeframe")
+
 
     
     while True:
@@ -274,7 +276,7 @@ def main():
         current_price = get_market_price()
         
         # calculate momentum of sine function
-        momentum = calculate_sine_momentum(current_price)
+        momentum = calculate_sine_momentum(timeframe, current_price, sinewave)
         
         if len(open_positions) == 0:
             # if there are no open positions, check for entry conditions
