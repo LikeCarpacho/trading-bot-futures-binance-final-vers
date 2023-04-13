@@ -54,7 +54,6 @@ def get_talib_poly_channel(data, degree):
     lower_channel = pr - np.std(data[-len(pr):]) * 2
     return upper_channel, lower_channel
 
-
 # Define timeframes
 timeframes = ['8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
 
@@ -75,7 +74,6 @@ for interval in timeframes:
             'close': float(candle[4]),
             'volume': float(candle[5])
         })
-
 
 def get_mtf_signal(candles, timeframes):
     """
@@ -111,7 +109,6 @@ def get_mtf_signal(candles, timeframes):
         mtf_signal[neutral_tf_typo] = 0
     return mtf_signal
 
-
 def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
     close_prices = [candle['close'] for candle in candles]
     diff = sliding_window_diff(close_prices)
@@ -134,8 +131,6 @@ def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
             else:
                 return None
     return None
-
-
 
 def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
     close_prices = [candle['close'] for candle in candles]
@@ -160,10 +155,6 @@ def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
                 return None
     return None
 
-
-
-
-
 def cancel_all_positions(symbol):
     """
     Cancels all open orders and positions for the specified symbol.
@@ -179,7 +170,6 @@ def cancel_all_positions(symbol):
                 client.futures_create_order(symbol=symbol, side='SELL', type='MARKET', quantity=position['positionAmt'])
             elif position['positionSide'] == 'SHORT':
                 client.futures_create_order(symbol=symbol, side='BUY', type='MARKET', quantity=position['positionAmt'])
-
 
 def log_trade_details(trade_type, entry_price, stop_loss, take_profit, quantity):
     """Logs the details of a trade"""
@@ -322,7 +312,6 @@ def main():
                 # reload script from beginning
                 is_reversal_key_point = False
                 print('Reloaded script from beginning')
-
 
 if __name__ == '__main__':
     main()
