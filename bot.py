@@ -193,6 +193,24 @@ def get_sinewave(ticker, interval, period):
 
     return sinewave
 
+def calculate_sine_momentum(current_price):
+    """
+    Calculate sine wave momentum using the current price and past candle data
+    """
+    sinewave = np.sin(np.linspace(-np.pi/2, 3*np.pi/2, SINEWAVE_PERIOD))
+    data = np.array([c['close'] for c in candles['1m']])
+    sinewaves = []
+    for i in range(SINEWAVE_PERIOD, len(data)):
+        sinewaves.append(np.sin(np.linspace(-np.pi/2, 3*np.pi/2, SINEWAVE_PERIOD)) * np.std(data[i-SINEWAVE_PERIOD:i+1]) + np.mean(data[i-SINEWAVE_PERIOD:i+1]))
+    sinewaves = np.array(sinewaves)
+    momentum = 0
+    for i in range(1, len(sinewaves)):
+        if all(sinewaves[i] > sinewaves[i-1] and sinewaves[i] > current_price for i in range(1, len(sinewaves))):
+            momentum += 1
+        elif all(sinewaves[i] < sinewaves[i-1] and sinewaves[i] < current_price for i in range(1, len(sinewaves))):
+            momentum -= 1
+    return momentum
+
 def get_market_price():
     ticker = client.get_ticker(symbol=TRADE_SYMBOL)
     return float(ticker['lastPrice'])
