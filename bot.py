@@ -156,7 +156,6 @@ def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
         return True
     return False
 
-
 def cancel_all_positions(symbol):
     """
     Cancels all open orders and positions for the specified symbol.
