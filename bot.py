@@ -110,23 +110,31 @@ def get_mtf_signal(candles, timeframes):
     
     return mtf_signal
 
-def get_all_lows(candles):
+def get_all_lows(prices):
     lows = []
-    for i in range(len(candles[timeframes[0]])):
-        low = float('inf')
-        for tf in timeframes:
-            low = min(low, candles[tf][i]['low'])
-        lows.append(low)
+    for i in range(len(prices)):
+        if i == 0:
+            lows.append(prices[i])
+        else:
+            if prices[i] < lows[-1]:
+                lows.append(prices[i])
+            else:
+                lows.append(lows[-1])
     return lows
 
-def get_all_highs(candles):
+
+def get_all_highs(prices):
     highs = []
-    for i in range(len(candles[timeframes[0]])):
-        high = float('-inf')
-        for tf in timeframes:
-            high = max(high, candles[tf][i]['high'])
-        highs.append(high)
+    for i in range(len(prices)):
+        if i == 0:
+            highs.append(prices[i])
+        else:
+            if prices[i] > highs[-1]:
+                highs.append(prices[i])
+            else:
+                highs.append(highs[-1])
     return highs
+
 
 def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
     close_prices = [candle['close'] for candle in candles]
@@ -193,24 +201,25 @@ def get_sinewave(ticker, interval, period):
 
     return sinewave
 
-def calculate_sine_momentum(current_price, candles):
+def calculate_sine_momentum(candles, timeframe, current_price, sinewave):
     """
-    Calculates the sine momentum indicator based on the last `SINEWAVE_PERIOD` candles.
-    Returns a positive value if the momentum is bullish and a negative value if the momentum is bearish.
+    Calculates the sine wave momentum
     """
-    # Get the closing prices of the last `SINEWAVE_PERIOD` candles
-    close_prices = [c['close'] for c in candles[-SINEWAVE_PERIOD:]]
+    highs = np.array([c['high'] for c in candles[timeframe]])
+    lows = np.array([c['low'] for c in candles[timeframe]])
+    close_prices = np.array([c['close'] for c in candles[timeframe]])
+    sinewave_mom = np.zeros_like(close_prices)
 
-    # Calculate the sine wave of the closing prices
-    sinewaves = calculate_sinewave(close_prices)
+    for i in range(1, len(close_prices)):
+        if sinewave[i-1] > 0:
+            sinewave_mom[i] = ((highs[i] - close_prices[i]) / (highs[i] - lows[i])) * sinewave[i]
+        elif sinewave[i-1] < 0:
+            sinewave_mom[i] = ((close_prices[i] - lows[i]) / (highs[i] - lows[i])) * sinewave[i]
+        else:
+            sinewave_mom[i] = sinewave[i]
 
-    # Check if the current price is above or below the last 2 peaks of the sine wave
-    if any(sinewaves[i] < sinewaves[i-1] and sinewaves[i] < current_price for i in range(1, len(sinewaves))):
-        return SINEWAVE_PERIOD  # Bullish momentum
-    elif any(sinewaves[i] > sinewaves[i-1] and sinewaves[i] > current_price for i in range(1, len(sinewaves))):
-        return -SINEWAVE_PERIOD  # Bearish momentum
-    else:
-        return 0  # No momentum
+    return sinewave_mom[-1] * current_price
+
 
 
 def get_market_price():
@@ -225,6 +234,18 @@ def main():
     take_profit = 0.0100
     open_positions = []
     is_reversal_key_point = False
+
+    # Load data
+    candles = {}
+    for tf in timeframes:
+        candles[tf] = load_data(tf)
+
+    # Calculate sinewave momentum
+    for tf in timeframes:
+        current_price = candles[tf][-1]['close']
+        sinewave = talib.SINWAVE(candles[tf]['high'], candles[tf]['low'], SINEWAVE_PERIOD)
+        momentum = calculate_sine_momentum(candles[tf], tf, current_price, sinewave)
+        print(f"Sinewave momentum for {tf} timeframe: {momentum}")
     
     while True:
         # get current market price
