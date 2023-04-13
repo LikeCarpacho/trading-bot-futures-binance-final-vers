@@ -193,23 +193,25 @@ def get_sinewave(ticker, interval, period):
 
     return sinewave
 
-def calculate_sine_momentum(current_price):
+def calculate_sine_momentum(current_price, candles):
     """
-    Calculate sine wave momentum using the current price and past candle data
+    Calculates the sine momentum indicator based on the last `SINEWAVE_PERIOD` candles.
+    Returns a positive value if the momentum is bullish and a negative value if the momentum is bearish.
     """
-    sinewave = np.sin(np.linspace(-np.pi/2, 3*np.pi/2, SINEWAVE_PERIOD))
-    data = np.array([c['close'] for c in candles['1m']])
-    sinewaves = []
-    for i in range(SINEWAVE_PERIOD, len(data)):
-        sinewaves.append(np.sin(np.linspace(-np.pi/2, 3*np.pi/2, SINEWAVE_PERIOD)) * np.std(data[i-SINEWAVE_PERIOD:i+1]) + np.mean(data[i-SINEWAVE_PERIOD:i+1]))
-    sinewaves = np.array(sinewaves)
-    momentum = 0
-    for i in range(1, len(sinewaves)):
-        if all(sinewaves[i] > sinewaves[i-1] and sinewaves[i] > current_price for i in range(1, len(sinewaves))):
-            momentum += 1
-        elif all(sinewaves[i] < sinewaves[i-1] and sinewaves[i] < current_price for i in range(1, len(sinewaves))):
-            momentum -= 1
-    return momentum
+    # Get the closing prices of the last `SINEWAVE_PERIOD` candles
+    close_prices = [c['close'] for c in candles[-SINEWAVE_PERIOD:]]
+
+    # Calculate the sine wave of the closing prices
+    sinewaves = calculate_sinewave(close_prices)
+
+    # Check if the current price is above or below the last 2 peaks of the sine wave
+    if any(sinewaves[i] < sinewaves[i-1] and sinewaves[i] < current_price for i in range(1, len(sinewaves))):
+        return SINEWAVE_PERIOD  # Bullish momentum
+    elif any(sinewaves[i] > sinewaves[i-1] and sinewaves[i] > current_price for i in range(1, len(sinewaves))):
+        return -SINEWAVE_PERIOD  # Bearish momentum
+    else:
+        return 0  # No momentum
+
 
 def get_market_price():
     ticker = client.get_ticker(symbol=TRADE_SYMBOL)
