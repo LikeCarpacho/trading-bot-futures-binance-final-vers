@@ -68,10 +68,13 @@ def load_data(symbol, interval, start_time, end_time):
 
 # Define timeframes
 timeframes = ['1d', '8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
+print(timeframes)
 
 # Define start and end time for historical data
 start_time = int(time.time()) - (86400 * 30)  # 30 days ago
 end_time = int(time.time())
+
+print()
 
 # Fetch historical data for BTCUSDT pair
 candles = {}
