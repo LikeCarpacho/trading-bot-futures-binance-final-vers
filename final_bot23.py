@@ -248,9 +248,11 @@ def calculate_sine_momentum(candles, timeframe, current_price):
 
     return sinewave_mom[-1] * current_price
 
-def get_market_price():
-    ticker = client.get_ticker(symbol=TRADE_SYMBOL)
+def get_latest_price(client, symbol):
+    """Get the latest price of a given symbol."""
+    ticker = client.futures_ticker(symbol=symbol)
     return float(ticker['lastPrice'])
+
 
 print()
 print("init main() function...")
