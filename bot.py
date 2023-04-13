@@ -69,7 +69,7 @@ def load_data(symbol, interval, start_time, end_time):
     return response_json
 
 # Define timeframes
-timeframes = ['1d', '8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
+timeframes = ['1d', '12h', '8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
 print(timeframes)
 
 # Define start and end time for historical data
