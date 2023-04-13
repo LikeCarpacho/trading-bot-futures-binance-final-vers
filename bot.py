@@ -57,6 +57,15 @@ def get_talib_poly_channel(data, degree):
     lower_channel = pr - np.std(data[-len(pr):]) * 2
     return upper_channel, lower_channel
 
+def load_data(symbol, interval, start_time, end_time):
+    """
+    Fetches historical candlestick data for a symbol and interval
+    """
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&startTime={start_time * 1000}&endTime={end_time * 1000}"
+    response = requests.get(url)
+    response_json = json.loads(response.text)
+    return response_json
+
 # Define timeframes
 timeframes = ['8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
 
@@ -220,8 +229,6 @@ def calculate_sine_momentum(candles, timeframe, current_price, sinewave):
 
     return sinewave_mom[-1] * current_price
 
-
-
 def get_market_price():
     ticker = client.get_ticker(symbol=TRADE_SYMBOL)
     return float(ticker['lastPrice'])
@@ -238,7 +245,7 @@ def main():
     # Load data
     candles = {}
     for tf in timeframes:
-        candles[tf] = load_data(tf)
+        candles[tf] = load_data(TRADE_SYMBOL, tf, start_time, end_time)
 
     # Calculate sinewave momentum
     for tf in timeframes:
