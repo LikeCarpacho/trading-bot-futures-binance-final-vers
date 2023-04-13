@@ -112,39 +112,48 @@ def get_mtf_signal(candles, timeframes):
     return mtf_signal
 
 
-def long_condition(candles, stop_loss, take_profit):
-    """
-    Determines if a long position should be opened based on the sinewave talib from 1min with close price data from 3min tf.
-    Returns True if a long position should be opened, False otherwise.
-    """
-    print("Running long_condition()...")
-    tf_3m_close = np.array(candles['3m'])[:, 3]
-    sw = talib.SINWMA(tf_3m_close, timeperiod=5)
-    sw_diff = np.diff(sw)
-    max_sw = np.max(sw)
-    min_sw = np.min(sw)
-    if sw[-1] > max_sw and sw_diff[-1] > ENTRY_MOMENTUM_THRESHOLD:
-        return True
-    elif sw[-1] < min_sw and sw_diff[-1] < -ENTRY_MOMENTUM_THRESHOLD:
-        return False
-    return False
+def check_long_entry(candles):
+    sw_diff = sliding_window_diff(candles['1m'], 3)
+    entry_momentum = 0
+    ENTRY_MOMENTUM_THRESHOLD = 3
+    STOP_LOSS_THRESHOLD = 0.02
+    TAKE_PROFIT_THRESHOLD = 0.05
+    
+    for i in range(1, len(sw_diff)):
+        if (sw_diff[i - 1] < 0 and sw_diff[i] > 0) or (sw_diff[i - 1] > 0 and sw_diff[i] < 0):
+            entry_momentum += 1
+        else:
+            entry_momentum = 0
+        if entry_momentum >= ENTRY_MOMENTUM_THRESHOLD:
+            entry_price = candles['1m'][-1]['close']
+            stop_loss_price = entry_price * (1 - STOP_LOSS_THRESHOLD)
+            take_profit_price = entry_price * (1 + TAKE_PROFIT_THRESHOLD)
+            print(f"Long position criteria met. Entry price: {entry_price}, stop loss price: {stop_loss_price}, take profit price: {take_profit_price}")
+            return True, entry_price, stop_loss_price, take_profit_price
+    return False, 0, 0, 0
 
-def short_condition(candles, stop_loss, take_profit):
-    """
-    Determines if a short position should be opened based on the sinewave talib from 1min with close price data from 3min tf.
-    Returns True if a short position should be opened, False otherwise.
-    """
-    print("Running short_condition()...")
-    tf_3m_close = np.array(candles['3m'])[:, 3]
-    sw = talib.SINWMA(tf_3m_close, timeperiod=5)
-    sw_diff = np.diff(sw)
-    max_sw = np.max(sw)
-    min_sw = np.min(sw)
-    if sw[-1] < min_sw and sw_diff[-1] < -ENTRY_MOMENTUM_THRESHOLD:
-        return True
-    elif sw[-1] > max_sw and sw_diff[-1] > ENTRY_MOMENTUM_THRESHOLD:
-        return False
-    return False
+
+def check_short_entry(candles):
+    sw_diff = sliding_window_diff(candles['1m'], 3)
+    entry_momentum = 0
+    ENTRY_MOMENTUM_THRESHOLD = 3
+    STOP_LOSS_THRESHOLD = 0.02
+    TAKE_PROFIT_THRESHOLD = 0.05
+    
+    for i in range(1, len(sw_diff)):
+        if (sw_diff[i - 1] > 0 and sw_diff[i] < 0) or (sw_diff[i - 1] < 0 and sw_diff[i] > 0):
+            entry_momentum += 1
+        else:
+            entry_momentum = 0
+        if entry_momentum >= ENTRY_MOMENTUM_THRESHOLD:
+            entry_price = candles['1m'][-1]['close']
+            stop_loss_price = entry_price * (1 + STOP_LOSS_THRESHOLD)
+            take_profit_price = entry_price * (1 - TAKE_PROFIT_THRESHOLD)
+            print(f"Short position criteria met. Entry price: {entry_price}, stop loss price: {stop_loss_price}, take profit price: {take_profit_price}")
+            return True, entry_price, stop_loss_price, take_profit_price
+    return False, 0, 0, 0
+
+
 
 def cancel_all_positions(symbol):
     """
