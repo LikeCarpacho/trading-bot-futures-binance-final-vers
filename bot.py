@@ -112,46 +112,55 @@ def get_mtf_signal(candles, timeframes):
     return mtf_signal
 
 
-def check_long_entry(candles):
-    sw_diff = sliding_window_diff(candles['1m'], 3)
-    entry_momentum = 0
-    ENTRY_MOMENTUM_THRESHOLD = 3
-    STOP_LOSS_THRESHOLD = 0.02
-    TAKE_PROFIT_THRESHOLD = 0.05
-    
-    for i in range(1, len(sw_diff)):
-        if (sw_diff[i - 1] < 0 and sw_diff[i] > 0) or (sw_diff[i - 1] > 0 and sw_diff[i] < 0):
-            entry_momentum += 1
+def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
+    close_prices = [candle['close'] for candle in candles]
+    diff = sliding_window_diff(close_prices)
+
+    momentum_counter = 0
+    for i in range(len(diff)-1):
+        if diff[i] < 0 and diff[i+1] > 0:
+            momentum_counter += 1
+        elif diff[i] > 0 and diff[i+1] < 0:
+            momentum_counter += 1
         else:
-            entry_momentum = 0
-        if entry_momentum >= ENTRY_MOMENTUM_THRESHOLD:
-            entry_price = candles['1m'][-1]['close']
-            stop_loss_price = entry_price * (1 - STOP_LOSS_THRESHOLD)
-            take_profit_price = entry_price * (1 + TAKE_PROFIT_THRESHOLD)
-            print(f"Long position criteria met. Entry price: {entry_price}, stop loss price: {stop_loss_price}, take profit price: {take_profit_price}")
-            return True, entry_price, stop_loss_price, take_profit_price
-    return False, 0, 0, 0
+            momentum_counter = 0
+
+        if momentum_counter >= ENTRY_MOMENTUM_THRESHOLD:
+            sinewave_signal = sine_wave_oscillator(close_prices, SINEWAVE_PERIOD)
+            if sinewave_signal == 1:
+                stop_loss = close_prices[-1] - close_prices[-1] * stop_loss_threshold
+                take_profit = close_prices[-1] + close_prices[-1] * take_profit_threshold
+                return {'direction': 'long', 'stop_loss': stop_loss, 'take_profit': take_profit}
+            else:
+                return None
+    return None
 
 
-def check_short_entry(candles):
-    sw_diff = sliding_window_diff(candles['1m'], 3)
-    entry_momentum = 0
-    ENTRY_MOMENTUM_THRESHOLD = 3
-    STOP_LOSS_THRESHOLD = 0.02
-    TAKE_PROFIT_THRESHOLD = 0.05
-    
-    for i in range(1, len(sw_diff)):
-        if (sw_diff[i - 1] > 0 and sw_diff[i] < 0) or (sw_diff[i - 1] < 0 and sw_diff[i] > 0):
-            entry_momentum += 1
+
+def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
+    close_prices = [candle['close'] for candle in candles]
+    diff = sliding_window_diff(close_prices)
+
+    momentum_counter = 0
+    for i in range(len(diff)-1):
+        if diff[i] > 0 and diff[i+1] < 0:
+            momentum_counter += 1
+        elif diff[i] < 0 and diff[i+1] > 0:
+            momentum_counter += 1
         else:
-            entry_momentum = 0
-        if entry_momentum >= ENTRY_MOMENTUM_THRESHOLD:
-            entry_price = candles['1m'][-1]['close']
-            stop_loss_price = entry_price * (1 + STOP_LOSS_THRESHOLD)
-            take_profit_price = entry_price * (1 - TAKE_PROFIT_THRESHOLD)
-            print(f"Short position criteria met. Entry price: {entry_price}, stop loss price: {stop_loss_price}, take profit price: {take_profit_price}")
-            return True, entry_price, stop_loss_price, take_profit_price
-    return False, 0, 0, 0
+            momentum_counter = 0
+
+        if momentum_counter >= ENTRY_MOMENTUM_THRESHOLD:
+            sinewave_signal = sine_wave_oscillator(close_prices, SINEWAVE_PERIOD)
+            if sinewave_signal == -1:
+                stop_loss = close_prices[-1] + close_prices[-1] * stop_loss_threshold
+                take_profit = close_prices[-1] - close_prices[-1] * take_profit_threshold
+                return {'direction': 'short', 'stop_loss': stop_loss, 'take_profit': take_profit}
+            else:
+                return None
+    return None
+
+
 
 
 
