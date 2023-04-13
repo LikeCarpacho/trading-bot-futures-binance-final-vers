@@ -97,28 +97,19 @@ def get_mtf_signal(candles, timeframes):
 
     # Loop through each timeframe
     for tf in timeframes:
-        data = np.array([c['close'] for c in candles[tf]])
+        data = np.array([c['close'] for c in candles[timeframes.index(tf)]])
         upper_channel, lower_channel = get_talib_poly_channel(data, 20)  # Use 20 degree polynomial regression
 
         # Calculate the signal based on whether the close is below the lowest channel or above the highest channel
-        close = candles[tf][-1]['close']
-        if close <= lower_channel[-1] or all([close <= get_talib_poly_channel(np.array([c['close'] for c in candles[tf]]), 20)[1][-1] for tf in timeframes]):
+        close = candles[timeframes.index(tf)][-1]['close']
+        if close <= lower_channel[-1] or all([close <= get_talib_poly_channel(np.array([c['close'] for c in candles[timeframes.index(tf)]]), 20)[1][-1] for tf in timeframes]):
             signal = "LONG"
-        elif close >= upper_channel[-1] or all([close >= get_talib_poly_channel(np.array([c['close'] for c in candles[tf]]), 20)[0][-1] for tf in timeframes]):
+        elif close >= upper_channel[-1] or all([close >= get_talib_poly_channel(np.array([c['close'] for c in candles[timeframes.index(tf)]]), 20)[0][-1] for tf in timeframes]):
             signal = "SHORT"
         else:
             signal = "NEUTRAL"
             neutral_tf.append(tf)
         
-        # Add signal to dictionary
-        mtf_signal[tf] = signal
-
-    # If all timeframes are neutral, return "NO TRADE" signal
-    if len(neutral_tf) == len(timeframes):
-        return "NO TRADE"
-    
-    return mtf_signal
-
 def get_all_lows(prices):
     lows = []
     for i in range(len(prices)):
@@ -131,7 +122,6 @@ def get_all_lows(prices):
                 lows.append(lows[-1])
     return lows
 
-
 def get_all_highs(prices):
     highs = []
     for i in range(len(prices)):
@@ -143,7 +133,6 @@ def get_all_highs(prices):
             else:
                 highs.append(highs[-1])
     return highs
-
 
 def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
     close_prices = [candle['close'] for candle in candles]
