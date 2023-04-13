@@ -240,6 +240,7 @@ def get_market_price():
     ticker = client.get_ticker(symbol=TRADE_SYMBOL)
     return float(ticker['lastPrice'])
 
+print()
 print("init main() function...")
 print()
 
