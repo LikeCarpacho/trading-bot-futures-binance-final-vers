@@ -39,6 +39,9 @@ REVERSAL_KEY_POINT = 6  # 6 periods after entry momentum for reversal key point
 # Variables
 closed_positions = []
 
+# Print account balance
+print("USDT Futures balance:", get_account_balance())
+
 def get_talib_poly_channel(data, degree):
     """
     Returns polynomial regression channel using data and degree
