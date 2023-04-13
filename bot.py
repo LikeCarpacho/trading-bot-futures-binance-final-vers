@@ -36,6 +36,8 @@ SINEWAVE_PERIOD = 12  # 12 periods for sinewave
 ENTRY_MOMENTUM_THRESHOLD = 3  # 3 consecutive candles above or below sinewave
 REVERSAL_KEY_POINT = 6  # 6 periods after entry momentum for reversal key point
 
+print()
+
 # Variables
 closed_positions = []
 
