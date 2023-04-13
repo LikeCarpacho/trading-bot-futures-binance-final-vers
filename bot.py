@@ -210,11 +210,11 @@ def main():
         
         if len(open_positions) == 0:
             # if there are no open positions, check for entry conditions
-            if momentum > 0 and current_price < entry_price - stop_loss:
+            if momentum < 0 and current_price < entry_price - stop_loss:
                 # enter long position
                 open_positions.append(('long', position_size, current_price))
                 print(f'Entered long position at {current_price}')
-            elif momentum < 0 and current_price > entry_price + stop_loss:
+            elif momentum > 0 and current_price > entry_price + stop_loss:
                 # enter short position
                 open_positions.append(('short', position_size, current_price))
                 print(f'Entered short position at {current_price}')
