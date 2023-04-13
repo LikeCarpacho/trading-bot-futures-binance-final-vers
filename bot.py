@@ -84,13 +84,13 @@ def get_mtf_signal(candles, timeframes):
         slope, poly, lower_band, upper_band = get_talib_poly_channel(np.array(candles[tf]['close']), 3)
         channel_width = upper_band - lower_band
         signal = None
-        if candles[tf]['close'][-1] > upper_band:
+        if candles[tf]['close'][-1] > upper_band[-1]:
             signal = 1
-        elif candles[tf]['close'][-1] < lower_band:
+        elif candles[tf]['close'][-1] < lower_band[-1]:
             signal = -1
-        elif candles[tf]['close'][-1] < (upper_band + lower_band) / 2:
+        elif candles[tf]['close'][-1] < (upper_band[-1] + lower_band[-1]) / 2:
             signal = -1
-        elif candles[tf]['close'][-1] > (upper_band + lower_band) / 2:
+        elif candles[tf]['close'][-1] > (upper_band[-1] + lower_band[-1]) / 2:
             signal = 1
         mtf_signal[tf] = signal
         if neutral_tf is None and channel_width > 0:
@@ -102,6 +102,7 @@ def get_mtf_signal(candles, timeframes):
     if neutral_tf_typo is not None:
         mtf_signal[neutral_tf_typo] = 0
     return mtf_signal
+
 
 def long_condition(candles, stop_loss, take_profit):
     """
@@ -125,26 +126,26 @@ def long_condition(candles, stop_loss, take_profit):
         print("Long condition not met.")
         return False, 0, 0
 
-def long_condition(candles, stop_loss, take_profit):
+def short_condition(candles, stop_loss, take_profit):
     """
-    Determines if a long position should be opened based on the sinewave talib from 1min with close price data from 3min tf.
-    Returns True if a long position should be opened, False otherwise.
+    Determines if a short position should be opened based on the sinewave talib from 1min with close price data from 3min tf.
+    Returns True if a short position should be opened, False otherwise.
     """
-    print("Running long_condition()...")
+    print("Running short_condition()...")
     tf_3m_close = np.array(candles['3m'])[:, 3]
     sw = talib.SINWMA(tf_3m_close, timeperiod=5)
     sw_diff = np.diff(sw)
     max_sw = np.max(sw)
     min_sw = np.min(sw)
-    exit_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Exit point is 3/4 of the way up the sine wave
-    entry_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Entry point is 3/4 of the way down the sine wave
-    stop_loss_price = candles['1m'][-1]['close'] * (1 - stop_loss)  # calculate stop loss price
-    take_profit_price = candles['1m'][-1]['close'] * (1 + take_profit)  # calculate take profit price
-    if sw[-2] < entry_point and sw[-1] > entry_point and sw[-1] > sw[-2] and sw[-1] > sw_diff[-1] and sw_diff[-1] > 0 and sw_diff[-2] > 0:
-        print("Long condition met.")
+    exit_point = (max_sw + min_sw) / 2 - (max_sw - min_sw) / 4  # Exit point is 3/4 of the way down the sine wave
+    entry_point = (max_sw + min_sw) / 2 + (max_sw - min_sw) / 4  # Entry point is 3/4 of the way up the sine wave
+    stop_loss_price = candles['1m'][-1]['close'] * (1 + stop_loss)  # calculate stop loss price
+    take_profit_price = candles['1m'][-1]['close'] * (1 - take_profit)  # calculate take profit price
+    if sw[-2] > entry_point and sw[-1] < entry_point and sw[-1] < sw[-2] and sw[-1] < sw_diff[-1] and sw_diff[-1] < 0 and sw_diff[-2] < 0:
+        print("Short condition met.")
         return True, stop_loss_price, take_profit_price
     else:
-        print("Long condition not met.")
+        print("Short condition not met.")
         return False, 0, 0
 
 def cancel_all_positions(symbol):
@@ -189,8 +190,8 @@ def main():
     # initialize variables
     position_size = 100
     entry_price = 1.2000
-    stop_loss = 0.0025
-    take_profit = 0.005
+    stop_loss = 0.0050
+    take_profit = 0.0100
     open_positions = []
     is_reversal_key_point = False
     
@@ -305,4 +306,7 @@ def main():
                 # reload script from beginning
                 is_reversal_key_point = False
                 print('Reloaded script from beginning')
-                
+
+
+if __name__ == '__main__':
+    main()
