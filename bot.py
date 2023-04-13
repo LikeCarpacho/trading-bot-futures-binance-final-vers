@@ -84,32 +84,30 @@ def get_mtf_signal(candles, timeframes):
     Returns a dictionary containing the MTF signals for each timeframe.
     """
     mtf_signal = {}
-    neutral_tf = None
-    neutral_tf_typo = None
+    neutral_tf = []
+
+    # Loop through each timeframe
     for tf in timeframes:
-        tf_data = np.array(candles[tf]['close'])
-        if len(tf_data) < 3:  # We need at least 3 values to calculate a linear regression line
-            continue
-        slope, poly, lower_band, upper_band = get_talib_poly_channel(tf_data, 3)
-        channel_width = upper_band - lower_band
-        signal = None
-        if tf_data[-1] > upper_band[-1]:
-            signal = -1
-        elif tf_data[-1] < lower_band[-1]:
-            signal = 1
-        elif tf_data[-1] < (upper_band[-1] + lower_band[-1]) / 2:
-            signal = 1
-        elif tf_data[-1] > (upper_band[-1] + lower_band[-1]) / 2:
-            signal = -1
+        data = np.array([c['close'] for c in candles[tf]])
+        upper_channel, lower_channel = get_talib_poly_channel(data, 20)  # Use 20 degree polynomial regression
+
+        # Calculate the signal based on whether the close is below the lowest channel or above the highest channel
+        close = candles[tf][-1]['close']
+        if close <= lower_channel[-1] or all([close <= get_talib_poly_channel(np.array([c['close'] for c in candles[tf]]), 20)[1][-1] for tf in timeframes]):
+            signal = "LONG"
+        elif close >= upper_channel[-1] or all([close >= get_talib_poly_channel(np.array([c['close'] for c in candles[tf]]), 20)[0][-1] for tf in timeframes]):
+            signal = "SHORT"
+        else:
+            signal = "NEUTRAL"
+            neutral_tf.append(tf)
+        
+        # Add signal to dictionary
         mtf_signal[tf] = signal
-        if neutral_tf is None and channel_width > 0:
-            neutral_tf = tf
-        elif channel_width > 0 and abs(channel_width - (upper_band[-2] - lower_band[-2])) < 0.05 * channel_width:
-            neutral_tf_typo = tf
-    if neutral_tf is not None:
-        mtf_signal[neutral_tf] = 0
-    if neutral_tf_typo is not None:
-        mtf_signal[neutral_tf_typo] = 0
+
+    # If all timeframes are neutral, return "NO TRADE" signal
+    if len(neutral_tf) == len(timeframes):
+        return "NO TRADE"
+    
     return mtf_signal
 
 def get_all_lows(candles):
@@ -143,7 +141,6 @@ def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
     if all(price < lower for lower, price in zip(get_all_lows(candles), close_prices)) and momentum_counter == -ENTRY_MOMENTUM_THRESHOLD:
         return True
     return False
-
 
 def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
     close_prices = [candle['close'] for candle in candles]
