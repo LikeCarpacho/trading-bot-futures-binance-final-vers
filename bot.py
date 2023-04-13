@@ -85,12 +85,26 @@ for interval in timeframes:
     candles[interval.lower()] = []
     for candle in tf_candles:
         candles[interval.lower()].append({
-            'open': float(candle[1]),
-            'high': float(candle[2]),
-            'low': float(candle[3]),
-            'close': float(candle[4]),
-            'volume': float(candle[5])
+            'open_time': candle[0],
+            'open': candle[1],
+            'high': candle[2],
+            'low': candle[3],
+            'close': candle[4],
+            'volume': candle[5],
+            'close_time': candle[6],
+            'quote_asset_volume': candle[7],
+            'number_of_trades': candle[8],
+            'taker_buy_base_asset_volume': candle[9],
+            'taker_buy_quote_asset_volume': candle[10]
         })
+
+        #Print candles for all timeframes
+        for interval in candles:
+            print(f"{interval} candles:")
+            for candle in candles[interval]:
+                print(candle)
+                print("--------")
+
 
 def get_mtf_signal(candles, timeframes):
     """
