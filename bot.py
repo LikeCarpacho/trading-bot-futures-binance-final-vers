@@ -134,29 +134,6 @@ def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
     momentum_counter = 0
     for i in range(len(diff)-1):
         if diff[i] < 0 and diff[i+1] > 0:
-            momentum_counter += 1
-        elif diff[i] > 0 and diff[i+1] < 0:
-            momentum_counter += 1
-        else:
-            momentum_counter = 0
-
-        if momentum_counter >= ENTRY_MOMENTUM_THRESHOLD:
-            sinewave_signal = sine_wave_oscillator(close_prices, SINEWAVE_PERIOD)
-            if sinewave_signal == 1:
-                stop_loss = close_prices[-1] - close_prices[-1] * stop_loss_threshold
-                take_profit = close_prices[-1] + close_prices[-1] * take_profit_threshold
-                return {'direction': 'long', 'stop_loss': stop_loss, 'take_profit': take_profit}
-            else:
-                return None
-    return None
-
-def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
-    close_prices = [candle['close'] for candle in candles]
-    diff = sliding_window_diff(close_prices)
-
-    momentum_counter = 0
-    for i in range(len(diff)-1):
-        if diff[i] < 0 and diff[i+1] > 0:
             momentum_counter -= 1
         elif diff[i] > 0 and diff[i+1] < 0:
             momentum_counter += 1
