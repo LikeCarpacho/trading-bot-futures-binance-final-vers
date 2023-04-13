@@ -269,8 +269,6 @@ def main():
         else:
             print(f"No data found for {tf} timeframe")
 
-
-    
     while True:
         # get current market price
         current_price = get_market_price()
