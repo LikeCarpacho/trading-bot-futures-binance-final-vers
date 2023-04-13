@@ -91,13 +91,13 @@ def get_mtf_signal(candles, timeframes):
         channel_width = upper_band - lower_band
         signal = None
         if tf_data[-1] > upper_band[-1]:
-            signal = 1
+            signal = -1
         elif tf_data[-1] < lower_band[-1]:
-            signal = -1
-        elif tf_data[-1] < (upper_band[-1] + lower_band[-1]) / 2:
-            signal = -1
-        elif tf_data[-1] > (upper_band[-1] + lower_band[-1]) / 2:
             signal = 1
+        elif tf_data[-1] < (upper_band[-1] + lower_band[-1]) / 2:
+            signal = 1
+        elif tf_data[-1] > (upper_band[-1] + lower_band[-1]) / 2:
+            signal = -1
         mtf_signal[tf] = signal
         if neutral_tf is None and channel_width > 0:
             neutral_tf = tf
@@ -108,6 +108,24 @@ def get_mtf_signal(candles, timeframes):
     if neutral_tf_typo is not None:
         mtf_signal[neutral_tf_typo] = 0
     return mtf_signal
+
+def get_all_lows(candles):
+    lows = []
+    for i in range(len(candles[timeframes[0]])):
+        low = float('inf')
+        for tf in timeframes:
+            low = min(low, candles[tf][i]['low'])
+        lows.append(low)
+    return lows
+
+def get_all_highs(candles):
+    highs = []
+    for i in range(len(candles[timeframes[0]])):
+        high = float('-inf')
+        for tf in timeframes:
+            high = max(high, candles[tf][i]['high'])
+        highs.append(high)
+    return highs
 
 def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
     close_prices = [candle['close'] for candle in candles]
@@ -132,6 +150,21 @@ def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
                 return None
     return None
 
+def check_long_entry(candles, stop_loss_threshold, take_profit_threshold):
+    close_prices = [candle['close'] for candle in candles]
+    diff = sliding_window_diff(close_prices)
+
+    momentum_counter = 0
+    for i in range(len(diff)-1):
+        if diff[i] < 0 and diff[i+1] > 0:
+            momentum_counter -= 1
+        elif diff[i] > 0 and diff[i+1] < 0:
+            momentum_counter += 1
+    if all(price < lower for lower, price in zip(get_all_lows(candles), close_prices)) and momentum_counter == ENTRY_MOMENTUM_THRESHOLD:
+        return True
+    return False
+
+
 def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
     close_prices = [candle['close'] for candle in candles]
     diff = sliding_window_diff(close_prices)
@@ -139,21 +172,13 @@ def check_short_entry(candles, stop_loss_threshold, take_profit_threshold):
     momentum_counter = 0
     for i in range(len(diff)-1):
         if diff[i] > 0 and diff[i+1] < 0:
-            momentum_counter += 1
+            momentum_counter -= 1
         elif diff[i] < 0 and diff[i+1] > 0:
             momentum_counter += 1
-        else:
-            momentum_counter = 0
+    if all(price > upper for upper, price in zip(get_all_highs(candles), close_prices)) and momentum_counter == -ENTRY_MOMENTUM_THRESHOLD:
+        return True
+    return False
 
-        if momentum_counter >= ENTRY_MOMENTUM_THRESHOLD:
-            sinewave_signal = sine_wave_oscillator(close_prices, SINEWAVE_PERIOD)
-            if sinewave_signal == -1:
-                stop_loss = close_prices[-1] + close_prices[-1] * stop_loss_threshold
-                take_profit = close_prices[-1] - close_prices[-1] * take_profit_threshold
-                return {'direction': 'short', 'stop_loss': stop_loss, 'take_profit': take_profit}
-            else:
-                return None
-    return None
 
 def cancel_all_positions(symbol):
     """
