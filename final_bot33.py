@@ -137,9 +137,6 @@ def get_mtf_signal(candles, timeframes):
     else:
         return signals, "BUY" if all([signal.startswith("BUY") for signal in signals.values()]) else "SELL"
 
-
-
-
 # Get the MTF signals
 signals, mtf_signal = get_mtf_signal(candles, timeframes)
 
@@ -212,7 +209,10 @@ def main():
     end_time = int(time.time())
 
     # Fetch historical data for BTCUSDT pair
-    candles = {}
+
+    # Load the candlestick data
+    candles = load_candles()
+
     for interval in timeframes:
         tf_candles = client.futures_klines(symbol=TRADE_SYMBOL, interval=interval.lower(), startTime=start_time * 1000, endTime=end_time * 1000)
         candles[interval.lower()] = []
