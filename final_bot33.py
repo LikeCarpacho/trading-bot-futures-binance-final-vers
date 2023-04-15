@@ -193,7 +193,7 @@ def main():
     client = Client(api_key, api_secret)
 
     # Get account balance and use entire futures balance for trading with 20x lvrg
-    USDT_balance = get_account_balance(client)
+    USDT_balance = get_account_balance()
     TRADE_SIZE = USDT_balance * 20  # Use entire balance with 20x leverage
 
     # Print account balance
