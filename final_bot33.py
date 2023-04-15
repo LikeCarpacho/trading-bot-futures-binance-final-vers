@@ -19,22 +19,18 @@ with open("credentials.txt", "r") as f:
 # Initialize Binance client
 client = Client(api_key, api_secret)
 
-def get_account_balance():
-    """
-    Get account balance for USDT in the futures wallet
-    """
+def get_account_balance(client):
     account_balance = client.futures_account_balance()
     for balance in account_balance:
         if balance['asset'] == 'USDT':
             return float(balance['balance'])
-    return 0.0  # return 0 if balance not found
 
-# Constants
 
+# Constants and vars
 # Get account balance and use entire futures balance for trading with 20x lvrg
 balance = client.futures_account_balance(asset='USDT')
 
-USDT_balance = get_account_balance()
+USDT_balance = get_account_balance(client)
 
 TRADE_SIZE = USDT_balance * 20  # Use entire balance with 20x leverage
 
@@ -54,7 +50,7 @@ print()
 closed_positions = []
 
 # Print account balance
-print("USDT Futures balance:", get_account_balance())
+print("USDT Futures balance:", get_account_balance(client))
 
 # Define timeframes
 timeframes = ['1d', '12h', '8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
@@ -195,7 +191,7 @@ def main():
     client = Client(api_key, api_secret)
 
     # Get account balance and use entire futures balance for trading with 20x lvrg
-    USDT_balance = get_account_balance()
+    USDT_balance = get_account_balance(client)
     TRADE_SIZE = USDT_balance * 20  # Use entire balance with 20x leverage
 
     # Print account balance
@@ -209,12 +205,14 @@ def main():
     end_time = int(time.time())
 
     # Fetch historical data for BTCUSDT pair
-
-    # Load the candlestick data
-    candles = load_candles()
-
+    candles = {}
     for interval in timeframes:
-        tf_candles = client.futures_klines(symbol=TRADE_SYMBOL, interval=interval.lower(), startTime=start_time * 1000, endTime=end_time * 1000)
+        tf_candles = client.futures_klines(
+            symbol=TRADE_SYMBOL,
+            interval=interval.lower(),
+            startTime=start_time * 1000,
+            endTime=end_time * 1000
+        )
         candles[interval.lower()] = []
         for candle in tf_candles:
             candles[interval.lower()].append({
@@ -251,6 +249,7 @@ def main():
             print(f"Order placement failed: {e}")
     else:
         print("No valid trading signal found")
+
 
 
 if __name__ == '__main__':
