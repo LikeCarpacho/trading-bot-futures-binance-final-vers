@@ -30,12 +30,20 @@ def get_account_balance():
     return 0.0  # return 0 if balance not found
 
 # Constants
+
+# Get account balance and use entire futures balance for trading with 20x lvrg
+balance = client.futures_account_balance(asset='USDT')
+
+USDT_balance = get_account_balance()
+
+TRADE_SIZE = USDT_balance * 20  # Use entire balance with 20x leverage
+
+#other constants
 TRADE_SYMBOL = "BTCUSDT"
-TRADE_SIZE = 0.01  # Trade size in BTC
 TRADE_TYPE = "MARKET"
 TRADE_LVRG = 20
-STOP_LOSS_THRESHOLD = 0.025  # 2.5% stop loss threshold
-TAKE_PROFIT_THRESHOLD = 0.050 # 5% take profit threshold
+STOP_LOSS_THRESHOLD = 0.0167  # 1.67% stop loss threshold
+TAKE_PROFIT_THRESHOLD = 0.0373 # 3.73% take profit threshold
 SINEWAVE_PERIOD = 12  # 12 periods for sinewave
 ENTRY_MOMENTUM_THRESHOLD = 3  # 3 consecutive candles above or below sinewave
 REVERSAL_KEY_POINT = 6  # 6 periods after entry momentum for reversal key point
@@ -175,144 +183,86 @@ print("init main() function...")
 print()
 
 def main():
-    # Get account balance
-    account_balance = get_account_balance()
+    try:
+        client.futures_change_leverage(symbol=TRADE_SYMBOL, leverage=LEVERAGE)
 
-    # Define stop loss and take profit prices
-    stop_loss_price = None
-    take_profit_price = None
+        # Stop loss and take profit
+        stop_loss = 0.02
+        take_profit = 0.03
 
-    # Define entry and exit prices
-    entry_price = None
-    exit_price = None
+        while True:
+            try:
+                # Get candlestick data
+                candles = np.array(client.futures_klines(symbol=TRADE_SYMBOL, interval=KLINE_INTERVAL))
+                close = candles[:, 4].astype(float)
 
-    # Define entry and exit timestamps
-    entry_timestamp = None
-    exit_timestamp = None
+                # Calculate indicators
+                sinewave = talib.SIN(close, SINEWAVE_PERIOD)
+                macd, signal, hist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
 
-    # Define trading direction (1 for long, -1 for short)
-    direction = None
+                # Get position info
+                position_info = client.futures_position_information(symbol=TRADE_SYMBOL)
 
-    # Define entry momentum counter
-    entry_momentum_counter = 0
+                # Check if stop loss or take profit is hit
+                if position_info:
+                    entry_price = float(position_info[0]['entryPrice'])
+                    unrealized_pnl = float(position_info[0]['unRealizedProfit'])
 
-    # Define sinewave data
-    sinewave_data = None
+                    if unrealized_pnl <= -(entry_price * stop_loss):
+                        # Close all positions and open new trade in opposite direction
+                        client.futures_cancel_all_open_orders(symbol=TRADE_SYMBOL)
 
-    # Define trade counter
-    trade_counter = 0
+                        positions = client.futures_position_information(symbol=TRADE_SYMBOL)
 
-    # Define timeframes
-    timeframes = ['1m']
+                        for position in positions:
+                            if float(position['positionAmt']) > 0:
+                                client.futures_create_order(
+                                    symbol=TRADE_SYMBOL,
+                                    side=SIDE_SELL,
+                                    type=ORDER_TYPE_MARKET,
+                                    quantity=position['positionAmt']
+                                )
+                            elif float(position['positionAmt']) < 0:
+                                client.futures_create_order(
+                                    symbol=TRADE_SYMBOL,
+                                    side=SIDE_BUY,
+                                    type=ORDER_TYPE_MARKET,
+                                    quantity=str(abs(float(position['positionAmt'])))
+                                )
 
-    while True:
-        # Check if there are open positions
-        if len(closed_positions) == trade_counter:
-            # No open positions, generate new signal
+                    elif unrealized_pnl >= entry_price * take_profit:
+                        # Close all positions
+                        client.futures_cancel_all_open_orders(symbol=TRADE_SYMBOL)
 
-            # Get sinewave data
-            klines = client.futures_klines(symbol=TRADE_SYMBOL, interval=timeframes[0], limit=SINEWAVE_PERIOD)
-            close_prices = np.array([float(k[4]) for k in klines])
-            sinewave_data = talib.SIN(close_prices, SINEWAVE_PERIOD)
+                        positions = client.futures_position_information(symbol=TRADE_SYMBOL)
 
-            # Check if the last candle is above the sinewave's min
-            if sinewave_data[-1] > np.min(sinewave_data):
-                # Entry signal for long position
-                direction = 1
-                entry_momentum_counter += 1
-                if entry_momentum_counter >= ENTRY_MOMENTUM_THRESHOLD:
-                    # Enter long trade
-                    entry_price = float(client.futures_symbol_ticker(symbol=TRADE_SYMBOL)['price'])
-                    entry_timestamp = int(time.time() * 1000)
-                    stop_loss_price = entry_price * (1 - STOP_LOSS_THRESHOLD)
-                    take_profit_price = entry_price * (1 + TAKE_PROFIT_THRESHOLD)
-                    order_quantity = (account_balance * TRADE_LVRG) / entry_price
-                    try:
-                        order = client.futures_create_order(
-                            symbol=TRADE_SYMBOL,
-                            side=SIDE_BUY,
-                            type=TRADE_TYPE,
-                            quantity=order_quantity,
-                            timeInForce=TIME_IN_FORCE_GTC
-                        )
-                    except (BinanceAPIException, BinanceOrderException) as e:
-                        print(f"Error placing order: {e}")
-                        continue
-                    trade_counter += 1
-                    entry_momentum_counter = 0
-            elif sinewave_data[-1] < np.max(sinewave_data):
-                # Entry signal for short position
-                direction = -1
-                entry_momentum_counter -= 1
-                if entry_momentum_counter <= -ENTRY_MOMENTUM_THRESHOLD:
-                    # Enter short trade
-                    entry_price = float(client.futures_symbol_ticker(symbol=TRADE_SYMBOL)['price'])
-                    entry_timestamp = int(time.time() * 1000)
-                    stop_loss_price = entry_price * (1 + STOP_LOSS_THRESHOLD)
-                    take_profit_price = entry_price * (1 - TAKE_PROFIT_THRESHOLD)
-                    order_quantity = (account_balance * TRADE_LVRG) / entry_price
-                    try:
-                        order = client.futures_create_order(
-                            symbol=TRADE_SYMBOL,
-                            side=SIDE_SELL,
-                            type=TRADE_TYPE,
-                            quantity=order_quantity,
-                            timeInForce=TIME_IN_FORCE_GTC
-                        )
-                    except (BinanceAPIException, BinanceOrderException) as e:
-                        print(f"Error placing order: {e}")
-                        continue
-                   
-                    # Print trade details
-                    print(f"SHORT TRADE DETAILS - Entry price: {entry_price}, Stop loss price: {stop_loss_price}, Take profit price: {take_profit_price}, Quantity: {order_quantity}")
-                    # Reset entry momentum counter
-                    entry_momentum_counter = 0
-                    # Set trailing stop loss
-                    trailing_stop_loss = True
-                else:
-                    # Entry momentum not strong enough
-                    print("Waiting for stronger entry signal...")
-            # Update trailing stop loss
-            if trailing_stop_loss:
-                # Check current price and update stop loss price accordingly
-                current_price = float(client.futures_symbol_ticker(symbol=TRADE_SYMBOL)['price'])
-                if direction == 1:
-                    # Long position
-                    new_stop_loss_price = current_price * (1 - TRAILING_STOP_LOSS_THRESHOLD)
-                    if new_stop_loss_price > stop_loss_price:
-                        stop_loss_price = new_stop_loss_price
-                        # Update stop loss order
-                        try:
-                            client.futures_create_order(
-                                symbol=TRADE_SYMBOL,
-                                side=SIDE_BUY,
-                                type=ORDER_TYPE_STOP_MARKET,
-                                quantity=order_quantity,
-                                stopPrice=stop_loss_price,
-                                timeInForce=TIME_IN_FORCE_GTC
-                            )
-                            print(f"Trailing stop loss updated - New stop loss price: {stop_loss_price}")
-                        except (BinanceAPIException, BinanceOrderException) as e:
-                            print(f"Error updating stop loss order: {e}")
-                            continue
-                elif direction == -1:
-                    # Short position
-                    new_stop_loss_price = current_price * (1 + TRAILING_STOP_LOSS_THRESHOLD)
-                    if new_stop_loss_price < stop_loss_price:
-                        stop_loss_price = new_stop_loss_price
-                        # Update stop loss order
-                        try:
-                            client.futures_create_order(
-                                symbol=TRADE_SYMBOL,
-                                side=SIDE_BUY,
-                                type=ORDER_TYPE_STOP_MARKET,
-                                quantity=order_quantity,
-                                stopPrice=stop_loss_price,
-                                timeInForce=TIME_IN_FORCE_GTC
-                            )
-                            print(f"Trailing stop loss updated - New stop loss price: {stop_loss_price}")
-                        except (BinanceAPIException, BinanceOrderException) as e:
-                            print(f"Error updating stop loss order: {e}")
-                            continue
-                    except Exception as e:
-                        print(f"Error occurred: {e}")
+                        for position in positions:
+                            if float(position['positionAmt']) > 0:
+                                client.futures_create_order(
+                                    symbol=TRADE_SYMBOL,
+                                    side=SIDE_SELL,
+                                    type=ORDER_TYPE_MARKET,
+                                    quantity=position['positionAmt']
+                                )
+                            elif float(position['positionAmt']) < 0:
+                                client.futures_create_order(
+                                    symbol=TRADE_SYMBOL,
+                                    side=SIDE_BUY,
+                                    type=ORDER_TYPE_MARKET,
+                                    quantity=str(abs(float(position['positionAmt'])))
+                                )
+
+                # Sleep until next candle
+                time.sleep(60 * CANDLES_PER_MINUTE)
+
+            except Exception as e:
+                print(e)
+                time.sleep(5)
+    except Exception as e:
+        print(e)
+
+
+
+
+if __name__ == '__main__':
+    main()
