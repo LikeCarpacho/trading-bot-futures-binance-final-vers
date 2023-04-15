@@ -183,86 +183,69 @@ print("init main() function...")
 print()
 
 def main():
-    try:
-        client.futures_change_leverage(symbol=TRADE_SYMBOL, leverage=LEVERAGE)
+    # Load credentials from file
+    with open("credentials.txt", "r") as f:
+        lines = f.readlines()
+        api_key = lines[0].strip()
+        api_secret = lines[1].strip()
 
-        # Stop loss and take profit
-        stop_loss = 0.02
-        take_profit = 0.03
+    # Initialize Binance client
+    client = Client(api_key, api_secret)
 
-        while True:
-            try:
-                # Get candlestick data
-                candles = np.array(client.futures_klines(symbol=TRADE_SYMBOL, interval=KLINE_INTERVAL))
-                close = candles[:, 4].astype(float)
+    # Get account balance and use entire futures balance for trading with 20x lvrg
+    USDT_balance = get_account_balance(client)
+    TRADE_SIZE = USDT_balance * 20  # Use entire balance with 20x leverage
 
-                # Calculate indicators
-                sinewave = talib.SIN(close, SINEWAVE_PERIOD)
-                macd, signal, hist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
+    # Print account balance
+    print("USDT Futures balance:", USDT_balance)
 
-                # Get position info
-                position_info = client.futures_position_information(symbol=TRADE_SYMBOL)
+    # Define timeframes
+    timeframes = ['1d', '12h', '8h', '4h', '2h', '1h', '30m', '15m', '5m', '3m', '1m']
 
-                # Check if stop loss or take profit is hit
-                if position_info:
-                    entry_price = float(position_info[0]['entryPrice'])
-                    unrealized_pnl = float(position_info[0]['unRealizedProfit'])
+    # Define start and end time for historical data
+    start_time = int(time.time()) - (86400 * 30)  # 30 days ago
+    end_time = int(time.time())
 
-                    if unrealized_pnl <= -(entry_price * stop_loss):
-                        # Close all positions and open new trade in opposite direction
-                        client.futures_cancel_all_open_orders(symbol=TRADE_SYMBOL)
+    # Fetch historical data for BTCUSDT pair
+    candles = {}
+    for interval in timeframes:
+        tf_candles = client.futures_klines(symbol=TRADE_SYMBOL, interval=interval.lower(), startTime=start_time * 1000, endTime=end_time * 1000)
+        candles[interval.lower()] = []
+        for candle in tf_candles:
+            candles[interval.lower()].append({
+                'timestamp': candle[0],
+                'open': float(candle[1]),
+                'high': float(candle[2]),
+                'low': float(candle[3]),
+                'close': float(candle[4]),
+                'volume': float(candle[5])
+            })
 
-                        positions = client.futures_position_information(symbol=TRADE_SYMBOL)
+    # Print the historical data for BTCUSDT pair
+    for interval in timeframes:
+        print(f"Data for {interval} interval:")
+        print(candles[interval.lower()])
 
-                        for position in positions:
-                            if float(position['positionAmt']) > 0:
-                                client.futures_create_order(
-                                    symbol=TRADE_SYMBOL,
-                                    side=SIDE_SELL,
-                                    type=ORDER_TYPE_MARKET,
-                                    quantity=position['positionAmt']
-                                )
-                            elif float(position['positionAmt']) < 0:
-                                client.futures_create_order(
-                                    symbol=TRADE_SYMBOL,
-                                    side=SIDE_BUY,
-                                    type=ORDER_TYPE_MARKET,
-                                    quantity=str(abs(float(position['positionAmt'])))
-                                )
+    # Analyze the price action for multiple timeframes and get the trading signal
+    trading_signal = get_mtf_signal(candles, timeframes, TRADE_SYMBOL, TRADE_SIZE, TRADE_TYPE, TRADE_LVRG, STOP_LOSS_THRESHOLD, TAKE_PROFIT_THRESHOLD, SINEWAVE_PERIOD, ENTRY_MOMENTUM_THRESHOLD, REVERSAL_KEY_POINT)
 
-                    elif unrealized_pnl >= entry_price * take_profit:
-                        # Close all positions
-                        client.futures_cancel_all_open_orders(symbol=TRADE_SYMBOL)
-
-                        positions = client.futures_position_information(symbol=TRADE_SYMBOL)
-
-                        for position in positions:
-                            if float(position['positionAmt']) > 0:
-                                client.futures_create_order(
-                                    symbol=TRADE_SYMBOL,
-                                    side=SIDE_SELL,
-                                    type=ORDER_TYPE_MARKET,
-                                    quantity=position['positionAmt']
-                                )
-                            elif float(position['positionAmt']) < 0:
-                                client.futures_create_order(
-                                    symbol=TRADE_SYMBOL,
-                                    side=SIDE_BUY,
-                                    type=ORDER_TYPE_MARKET,
-                                    quantity=str(abs(float(position['positionAmt'])))
-                                )
-
-                # Sleep until next candle
-                time.sleep(60 * CANDLES_PER_MINUTE)
-
-            except Exception as e:
-                print(e)
-                time.sleep(5)
-    except Exception as e:
-        print(e)
-
-
-
+    # Place the order if a valid trading signal is found
+    if trading_signal:
+        try:
+            order = client.futures_create_order(
+                symbol=TRADE_SYMBOL,
+                side=trading_signal['side'],
+                type=trading_signal['type'],
+                quantity=trading_signal['quantity'],
+                leverage=trading_signal['leverage'],
+                stopLoss=trading_signal['stop_loss'],
+                takeProfit=trading_signal['take_profit']
+            )
+            print(f"Order successfully placed: {order}")
+        except (BinanceAPIException, BinanceOrderException) as e:
+            print(f"Order placement failed: {e}")
+    else:
+        print("No valid trading signal found")
 
 if __name__ == '__main__':
     main()
