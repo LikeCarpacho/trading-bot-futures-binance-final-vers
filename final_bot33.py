@@ -132,7 +132,12 @@ def get_mtf_signal(candles, timeframes):
     signals = {tf: signal for tf, signal in signals.items() if signal != "NEUTRAL"}
 
     # Return the signals dictionary along with the buy or sell signal for each timeframe
-    return signals, "BUY" if all([signal.startswith("BUY") for signal in signals.values()]) else "SELL"
+    if len(signals) == 0:
+        return None, None
+    else:
+        return signals, "BUY" if all([signal.startswith("BUY") for signal in signals.values()]) else "SELL"
+
+
 
 
 # Get the MTF signals
@@ -227,25 +232,26 @@ def main():
         print(candles[interval.lower()])
 
     # Analyze the price action for multiple timeframes and get the trading signal
-    trading_signal = get_mtf_signal(candles, timeframes, TRADE_SYMBOL, TRADE_SIZE, TRADE_TYPE, TRADE_LVRG, STOP_LOSS_THRESHOLD, TAKE_PROFIT_THRESHOLD, SINEWAVE_PERIOD, ENTRY_MOMENTUM_THRESHOLD, REVERSAL_KEY_POINT)
+    signals, signal_type = get_mtf_signal(candles, timeframes)
 
     # Place the order if a valid trading signal is found
-    if trading_signal:
+    if signals:
         try:
             order = client.futures_create_order(
                 symbol=TRADE_SYMBOL,
-                side=trading_signal['side'],
-                type=trading_signal['type'],
-                quantity=trading_signal['quantity'],
-                leverage=trading_signal['leverage'],
-                stopLoss=trading_signal['stop_loss'],
-                takeProfit=trading_signal['take_profit']
+                side=signals['side'],
+                type=signals['type'],
+                quantity=signals['quantity'],
+                leverage=signals['leverage'],
+                stopLoss=signals['stop_loss'],
+                takeProfit=signals['take_profit']
             )
             print(f"Order successfully placed: {order}")
         except (BinanceAPIException, BinanceOrderException) as e:
             print(f"Order placement failed: {e}")
     else:
         print("No valid trading signal found")
+
 
 if __name__ == '__main__':
     main()
